@@ -4,7 +4,6 @@ import { PrismaClient } from '@prisma/client';
 import { Queue } from 'bullmq';
 
 const prisma = new PrismaClient();
-const aiEngine = new AIEngine();
 
 // Initialize Redis queue for background jobs
 const redisQueue = new Queue('outreach-jobs', {
@@ -27,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use AI to understand the user's business needs
-    const businessProfile = aiEngine.understandBusinessNeeds(message);
+    const businessProfile = AIEngine.understandBusinessNeeds(message);
 
     // Generate AI response
     const aiResponse = await generateAIResponse(message, businessProfile);
@@ -223,3 +222,4 @@ async function handleCampaignCreation(message: string, profile: any, userId: str
     return null;
   }
 }
+
