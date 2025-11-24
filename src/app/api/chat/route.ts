@@ -222,4 +222,3 @@ async function handleCampaignCreation(message: string, profile: any, userId: str
     return null;
   }
 }
-
