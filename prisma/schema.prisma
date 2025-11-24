@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  avatar            String?
+  gmailConnected    Boolean  @default(false)
+  gmailRefreshToken String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  campaigns         Campaign[]
+  oauthCredentials  OAuthCredential[]
+  metrics           Metric[]
+  emails            Email[]
+  replies           Reply[]
+  
+  @@map("users")
+}
+
+model Campaign {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  targetIndustry  String?
+  targetLocation  String?
+  targetRole      String?
+  keywords        String[]
+  status          CampaignStatus @default(ACTIVE)
+  dailyLimit      Int      @default(50)
+  lastScrapedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User      @relation(fields: [userId], references: [id])
+  leads           Lead[]
+  emails          Email[]
+  scrapeHistory   ScrapeHistory[]
+  
+  @@map("campaigns")
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  campaignId  String
+  email       String
+  name        String?
+  company     String?
+  role        String?
+  location    String?
+  source      String
+  status      LeadStatus @default(NEW)
+  score       Float?
+  metadata    Json?
+  scrapedAt   DateTime @default(now())
+  
+  // Relations
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  emails      Email[]
+  replies     Reply[]
+  
+  @@unique([campaignId, email])
+  @@map("leads")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  CONVERTED
+  BLOCKED
+}
+
+model Email {
+  id            String      @id @default(cuid())
+  campaignId    String
+  leadId        String
+  userId        String
+  subject       String
+  content       String
+  templateId    String?
+  messageId     String?     // Gmail message ID
+  status        EmailStatus @default(QUEUED)
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  openedAt      DateTime?
+  clickedAt     DateTime?
+  error         String?
+  retryCount    Int         @default(0)
+  createdAt     DateTime    @default(now())
+  
+  // Relations
+  campaign      Campaign    @relation(fields: [campaignId], references: [id])
+  lead          Lead        @relation(fields: [leadId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+  replies       Reply[]
+  
+  @@map("emails_sent")
+}
+
+enum EmailStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+}
+
+model Reply {
+  id            String        @id @default(cuid())
+  emailId       String
+  leadId        String
+  userId        String
+  content       String
+  classification Classification @default(UNCERTAIN)
+  confidence    Float
+  intent        String?
+  aiSummary     String?
+  autoReplySent Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  
+  // Relations
+  email         Email         @relation(fields: [emailId], references: [id])
+  lead          Lead          @relation(fields: [leadId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  
+  @@map("replies")
+}
+
+enum Classification {
+  INTERESTED
+  NOT_INTERESTED
+  QUESTION
+  FOLLOW_UP
+  SPAM
+  UNCLEAR
+  UNCERTAIN
+}
+
+model Metric {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  metrics   Json     // Store daily metrics as JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, date])
+  @@map("metrics")
+}
+
+model ScrapeHistory {
+  id          String         @id @default(cuid())
+  campaignId  String
+  status      ScrapeStatus   @default(RUNNING)
+  totalFound  Int            @default(0)
+  validLeads  Int            @default(0)
+  duplicates  Int            @default(0)
+  errors      String[]
+  startedAt   DateTime       @default(now())
+  completedAt DateTime?
+  
+  // Relations
+  campaign    Campaign       @relation(fields: [campaignId], references: [id])
+  
+  @@map("scrape_history")
+}
+
+enum ScrapeStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+model OAuthCredential {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // 'gmail'
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  scope        String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  user         User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, provider])
+  @@map("oauth_credentials")
+}
